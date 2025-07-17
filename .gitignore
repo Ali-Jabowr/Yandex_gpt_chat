@@ -39,3 +39,39 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# PDF test files (generated)
+*.pdf
+/test-*.pdf
+
+# Additional build files
+.turbo/
+.vite/
+*.tgz
+
+# Logs
+*.log
+logs/
+
+# AI/ML models cache
+.cache/
+.embeddings/
+
+# Personal dev files
+.zencoder/

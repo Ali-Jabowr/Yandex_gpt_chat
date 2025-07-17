@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
+import { buildContext, createSystemPrompt } from '@/lib/contextBuilder';
+import { initializeKnowledgeBase } from '@/lib/initializeKnowledgeBase';
 
 export async function POST(req: Request) {
-  const { messages } = await req.json();
+  const { messages, pdfContext } = await req.json();
 
   if (!process.env.YANDEX_IAM_TOKEN) {
     return NextResponse.json(
@@ -11,13 +13,24 @@ export async function POST(req: Request) {
   }
 
   try {
+    // Ensure knowledge base is initialized
+    await initializeKnowledgeBase();
+
+    // Get the last user message for context search
+    const lastUserMessage = messages.filter((msg: any) => msg.isUser).slice(-1)[0];
+    const userQuery = lastUserMessage?.text || '';
+
+    // Build context using both uploaded PDF and knowledge base
+    const contextResult = await buildContext(userQuery, pdfContext);
+    const systemPrompt = createSystemPrompt(contextResult);
+
     const response = await fetch(
       'https://llm.api.cloud.yandex.net/foundationModels/v1/completion',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.YANDEX_IAM_TOKEN}` // Changed to Bearer token
+          'Authorization': `Bearer ${process.env.YANDEX_IAM_TOKEN}`
         },
         body: JSON.stringify({
           modelUri: `gpt://${process.env.FOLDER_ID}/yandexgpt-lite`,
@@ -28,7 +41,7 @@ export async function POST(req: Request) {
           messages: [
             {
               role: 'system',
-              text: 'You are a helpful assistant'
+              text: systemPrompt
             },
             ...messages.map((msg: any) => ({
               role: msg.isUser ? 'user' : 'assistant',
@@ -45,7 +58,12 @@ export async function POST(req: Request) {
     }
 
     const data = await response.json();
-    return NextResponse.json(data.result.alternatives[0].message);
+    return NextResponse.json({
+      text: data.result.alternatives[0].message.text,
+      sources: contextResult.sources,
+      hasKnowledgeBase: contextResult.hasKnowledgeBase,
+      hasUploadedPdf: contextResult.hasUploadedPdf
+    });
     
   } catch (error) {
     console.error('API Error:', error);
